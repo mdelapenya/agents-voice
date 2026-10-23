@@ -1,0 +1,6 @@
+# Everything derived from a specific person's GitHub history stays local.
+out/
+voice.config.json
+node_modules/
+.DS_Store
+__pycache__/

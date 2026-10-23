@@ -1,0 +1,22 @@
+{
+  "name": "agents-voice",
+  "version": "0.1.0",
+  "description": "Build an Agent Skill that lets coding agents write public GitHub text in a real maintainer's voice, from that maintainer's own GitHub history.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "setup": "node setup.mjs",
+    "harvest": "node pipeline/harvest.mjs && node pipeline/review-comments.mjs",
+    "normalize": "node pipeline/normalize.mjs",
+    "label:prepare": "node label/prepare.mjs comment,review chunk && node label/prepare.mjs review_comment rc",
+    "label:merge": "node label/merge.mjs",
+    "index": "python3 pipeline/voice_index.py build",
+    "style": "node pipeline/gen_style.mjs",
+    "assemble": "node pipeline/assemble.mjs",
+    "build": "npm run normalize && npm run style && npm run index && npm run assemble",
+    "eval:holdout": "node eval/build_holdout.mjs 100 && python3 pipeline/voice_index.py build --exclude \"$(node -e 'import(\"./lib/config.mjs\").then(m=>console.log(m.cfg.eval))')/holdout.jsonl\" --out \"$(node -e 'import(\"./lib/config.mjs\").then(m=>console.log(m.cfg.eval))')/voice-eval.sqlite\"",
+    "eval:render": "node eval/render.mjs"
+  }
+}

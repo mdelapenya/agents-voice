@@ -1,0 +1,10 @@
+{
+  "login": "octocat",
+  "name": "The Octocat",
+  "pronoun": "they",
+  "window": { "from": "2019-05-01", "to": "2025-09-01" },
+  "era": "2023-01-01",
+  "disclosure": "🤖 Written assisted by my {harness}",
+  "skillName": "octocat-voice",
+  "out": "out/octocat"
+}
