@@ -1,7 +1,9 @@
 # agents-voice
 
 > [!NOTE]
-> I created this song (in Spanish) to represent this repo: https://suno.com/s/rWFj7L6CEOXVcwB5
+> I created two songs to represent this repo:
+> - English: https://suno.com/s/qZB9j3gAPMIxVWrf
+> - Spanish: https://suno.com/s/rWFj7L6CEOXVcwB5
 
 Build an [Agent Skill](https://agentskills.io) that lets coding agents (Claude Code, Codex, Cursor, …) write public
 GitHub text in a real maintainer's voice: their stance, their length, their rituals, their boundaries. The input is
