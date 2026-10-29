@@ -8,10 +8,19 @@
 # daemon answers; otherwise falls back to the host's python3. Both scripts are stdlib-only,
 # so the two paths behave identically. Set VOICE_RUNTIME=host to skip Docker on purpose,
 # VOICE_PY_IMAGE to pin another image, VOICE_DB to point at a specific voice.sqlite.
+# On Windows it runs under Git Bash (or MSYS2/Cygwin) against Docker Desktop.
 set -euo pipefail
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL="$(cd "$HERE/.." && pwd)"
+# Resolve symlinks (and Windows junctions) so "$SKILL/.." is the real parent, not the link's.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SKILL="$(cd "$HERE/.." && pwd -P)"
+
+windows=0
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) windows=1 ;; esac
+
+# Path Docker should read on the host for a POSIX path. Docker Desktop on Windows wants
+# C:/Users/..., while the container keeps the POSIX form (/c/Users/...) as mount target.
+host_path() { if [ "$windows" = 1 ]; then cygpath -m "$1"; else printf '%s\n' "$1"; fi; }
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift
 case "$cmd" in
@@ -24,24 +33,33 @@ esac
 db="${VOICE_DB:-}"
 if [ -z "$db" ]; then
   for c in "$HERE/voice.sqlite" "$SKILL/voice.sqlite" "$SKILL/../voice.sqlite"; do
-    if [ -f "$c" ]; then db="$(cd "$(dirname "$c")" && pwd)/voice.sqlite"; break; fi
+    if [ -f "$c" ]; then db="$(cd "$(dirname "$c")" && pwd -P)/voice.sqlite"; break; fi
   done
+elif [ "$windows" = 1 ]; then
+  db="$(cygpath -u "$db")"
 fi
 
 if [ "${VOICE_RUNTIME:-docker}" = "docker" ] && command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   image="${VOICE_PY_IMAGE:-python:3.12-slim}"
   run=(docker run --rm --network none --user "$(id -u):$(id -g)" -w "$PWD"
-       -v "$SKILL:$SKILL:ro" -v "$PWD:$PWD")
-  [ -n "$db" ] && run+=(-v "$db:$db:ro" -e "VOICE_DB=$db")
+       -v "$(host_path "$SKILL"):$SKILL:ro" -v "$(host_path "$PWD"):$PWD")
+  [ -n "$db" ] && run+=(-v "$(host_path "$db"):$db:ro" -e "VOICE_DB=$db")
   # A draft passed to `lint` may live outside $PWD: mount it read-only at its own path.
   for a in "$@"; do
     if [ -f "$a" ]; then
       abs="$(cd "$(dirname "$a")" && pwd)/$(basename "$a")"
-      case "$abs" in "$PWD"/*|"$SKILL"/*) ;; *) run+=(-v "$abs:$abs:ro") ;; esac
+      case "$abs" in "$PWD"/*|"$SKILL"/*) ;; *) run+=(-v "$(host_path "$abs"):$abs:ro") ;; esac
     fi
   done
+  # The container paths are POSIX on purpose: stop MSYS from rewriting them into C:\... forms.
+  [ "$windows" = 1 ] && export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
   exec "${run[@]}" "$image" python3 -I "$script" "$@"
 fi
 
-command -v python3 >/dev/null 2>&1 || { echo "voice: neither docker nor python3 is available" >&2; exit 127; }
-exec python3 -I "$script" "$@"
+# Pick the first interpreter that runs: on Windows, python3 may be the Microsoft Store stub,
+# and the real one is often only reachable as python or the py launcher.
+pys=(python3); [ "$windows" = 1 ] && pys+=(python "py -3")
+for py in "${pys[@]}"; do
+  if command -v "${py%% *}" >/dev/null 2>&1 && $py -c '' >/dev/null 2>&1; then exec $py -I "$script" "$@"; fi
+done
+echo "voice: neither docker nor python3 is available" >&2; exit 127
